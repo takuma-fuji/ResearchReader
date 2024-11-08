@@ -1,6 +1,4 @@
-import os
 import base64
-from typing import List
 
 import cv2
 import numpy as np
@@ -18,21 +16,24 @@ load_dotenv(dotenv_path="/workspace/.env.local")
 
 TOP_K = 5
 
+
 def main():
     st.title("Research Reader")
 
-    if 'vectorstore' not in st.session_state:
+    if "vectorstore" not in st.session_state:
         st.session_state.vectorstore = None
 
-    if 'messages' not in st.session_state:
+    if "messages" not in st.session_state:
         st.session_state.messages = []
 
     with st.sidebar:
-        if 'uploaded_file' not in st.session_state:
+        if "uploaded_file" not in st.session_state:
             st.session_state.uploaded_file = None
 
         if st.session_state.uploaded_file is None:
-            uploaded_file = st.file_uploader("PDFファイルをアップロードしてください", type=["pdf"])
+            uploaded_file = st.file_uploader(
+                "PDFファイルをアップロードしてください", type=["pdf"]
+            )
             if uploaded_file is not None:
                 st.session_state.uploaded_file = uploaded_file
                 process_and_store_pdf(uploaded_file)
@@ -61,20 +62,11 @@ def main():
                 for i, metadata in enumerate(metadata_list):
                     if (i in [0, TOP_K]) and (metadata["type"] == "Image"):
                         show_fig(metadata["image_base64"])
-                        st.markdown(
-                            f"**画像引用ページ**: p.{metadata['page_number']}"
-                        )
-                    if (
-                        f'p.{metadata["page_number"]}'
-                        not in citations
-                    ):
-                        citations[
-                            f'p.{metadata["page_number"]}'
-                        ] = 1
+                        st.markdown(f"**画像引用ページ**: p.{metadata['page_number']}")
+                    if f'p.{metadata["page_number"]}' not in citations:
+                        citations[f'p.{metadata["page_number"]}'] = 1
                     else:
-                        citations[
-                            f'p.{metadata["page_number"]}'
-                        ] += 1
+                        citations[f'p.{metadata["page_number"]}'] += 1
 
                 sorted_citations = sorted(
                     citations.items(), key=lambda item: item[1], reverse=True
@@ -87,6 +79,7 @@ def main():
     else:
         st.write("PDFファイルをアップロードしてください。")
 
+
 def process_and_store_pdf(uploaded_file):
     images, texts = process_pdf(uploaded_file)
     st.write("PDFの処理が完了しました。")
@@ -95,6 +88,7 @@ def process_and_store_pdf(uploaded_file):
     vectorstore = build_vectorstore(texts, images)
     st.session_state.vectorstore = vectorstore
     st.write("ベクトルストアの構築が完了しました。")
+
 
 def build_vectorstore(texts, images):
     embeddings = OpenAIEmbeddings(
@@ -106,6 +100,7 @@ def build_vectorstore(texts, images):
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=128)
     add_vectorstore(vectorstore, texts, images, text_splitter)
     return vectorstore
+
 
 def process_pdf(file):
     # Get Elements
@@ -143,6 +138,7 @@ def process_pdf(file):
 
     return images, texts
 
+
 def del_small_images(images, max_kb=30):
     over_max_kb_image_list = []
     for image in images:
@@ -158,6 +154,7 @@ def del_small_images(images, max_kb=30):
         else:
             over_max_kb_image_list.append(image)
     return over_max_kb_image_list
+
 
 def merge_texts(texts):
     combined_texts = {}
@@ -184,23 +181,28 @@ def merge_texts(texts):
 
     return result
 
+
 def add_summary(images):
     for image in images:
         image["summary"] = image_summarize(image)
     return images
 
+
 def image_summarize(image):
     if image["type"] == "Table":
         prompt = (
-            "表が画像データとして提供されています。"
-            "画像データをもとに、この表に含まれる情報をもれなく正確に、日本語の文章で説明してください。"
-            "ただし与えられた表の画像が読み取りにくい場合には、次に提供するHTML形式の表を使用して情報をもれなく正確に日本語で説明してください。"
-            "表のHTML形式: {html}"
-            "また、HTML形式には誤字が含まれている可能性がありますので、以下のテキスト情報を参考にしてください。"
-            "テキスト情報: {text}"
-        ).format(html=image["metadata"].get("text_as_html", ""), text=image["text"])
+            """
+            以下の手順に従って、提供された表に含まれる情報を正確かつ漏れなく日本語の文章で説明してください。
+            1. まず、画像データとして提供されている表をもとに情報を文章化してください。表の内容を漏れなく、かつ正確に記述することを目指してください。
+            2. もし画像データが読みにくい場合は、次に提供するHTML形式の表を参考にして情報を文章化してください。
+            HTML形式の表: {html}
+            表の内容をもれなく正確に反映した日本語の説明を作成してください。
+            """
+        ).format(html=image["metadata"].get("text_as_html", ""))
     else:
-        prompt = "この画像に含まれる情報をもれなく正確に日本語で説明してください。"
+        prompt = """
+        以下の画像に含まれる情報を、もれなく正確に日本語の文章で説明してください。各項目や数値、細かな内容も含め、画像の内容を忠実に反映してください。
+        """
 
     chat = ChatOpenAI(model="gpt-4o")
 
@@ -221,6 +223,7 @@ def image_summarize(image):
     )
 
     return msg.content
+
 
 def add_vectorstore(vectorstore, texts, images, text_splitter):
     chunks = []
@@ -267,6 +270,7 @@ def add_vectorstore(vectorstore, texts, images, text_splitter):
             ]
         )
 
+
 def generate_output(vectorstore, user_input):
     embeddings = OpenAIEmbeddings(
         model="text-embedding-ada-002",
@@ -286,6 +290,7 @@ def generate_output(vectorstore, user_input):
 
     result = chat_based_on_texts(texts_retrieved, question)
     return result, metadata_list
+
 
 def regenerate_question(user_input):
     llm = ChatOpenAI(temperature=0, model="gpt-4o")
@@ -313,29 +318,31 @@ def regenerate_question(user_input):
     ans = chain.invoke(args)
     return str(ans.content)
 
+
 def chat_based_on_texts(texts_retrieved, question):
     texts = "\n\n".join(texts_retrieved)
     prompt_text = f"""
-        以下の文書に基づいて質問に対する厳密な回答を生成してください。
-        ----------
-        会話記録を元にユーザーとの会話のキャッチボールを成立させてください。
-        ----------
-        会話記録{st.session_state.messages}
-        ----------
-        文書: {texts}
-        ----------
-        質問: {question}
+        RAG（Retrieval-Augmented Generation）で検索した関連文書と、これまでの会話記録を参考にして、ユーザーの質問に対する正確で厳密な回答を生成してください。文書は事実関係の根拠として使用し、会話の流れを維持するために会話記録を活用してください。
+
+        関連文書: {texts}
+
+        会話記録: {st.session_state.messages}
+        ユーザーの質問: {question}
+
+        ユーザーの質問に対して関連文書の内容に基づいた厳密な回答を行い、過去の会話の流れを意識した自然なやり取りを心がけてください。
         """
     chat = ChatOpenAI(model="gpt-4o")
     return st.write_stream(
         chat.stream([HumanMessage(content=[{"type": "text", "text": prompt_text}])])
     )
 
+
 def show_fig(image_base64):
     img_binary = base64.b64decode(image_base64)
     jpg = np.frombuffer(img_binary, dtype=np.uint8)
     img = cv2.imdecode(jpg, cv2.IMREAD_COLOR)
     st.image(img)
+
 
 if __name__ == "__main__":
     main()
