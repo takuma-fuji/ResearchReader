@@ -322,14 +322,14 @@ def regenerate_question(user_input):
 def chat_based_on_texts(texts_retrieved, question):
     texts = "\n\n".join(texts_retrieved)
     prompt_text = f"""
-        RAG（Retrieval-Augmented Generation）で検索した関連文書と、これまでの会話記録を参考にして、ユーザーの質問に対する正確で厳密な回答を生成してください。文書は事実関係の根拠として使用し、会話の流れを維持するために会話記録を活用してください。
+        データベース内の関連文書と、これまでの会話記録を参考にして、ユーザーの質問に対する正確で厳密な回答を生成してください。文書は事実関係の根拠として使用し、会話の流れを理解するために会話記録を活用してください。
 
         関連文書: {texts}
 
         会話記録: {st.session_state.messages}
         ユーザーの質問: {question}
 
-        ユーザーの質問に対して関連文書の内容に基づいた厳密な回答を行い、過去の会話の流れを意識した自然なやり取りを心がけてください。
+        ユーザーの質問に対して関連文書の内容に基づいた厳密な回答を行ってください。
         """
     chat = ChatOpenAI(model="gpt-4o")
     return st.write_stream(
