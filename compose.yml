@@ -8,3 +8,4 @@ services:
     volumes:
       - .:/workspace
     tty: true
+    command: streamlit run app/research_reader.py
